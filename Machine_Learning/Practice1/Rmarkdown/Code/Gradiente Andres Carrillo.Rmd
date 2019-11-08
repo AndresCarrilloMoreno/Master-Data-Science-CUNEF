@@ -1,0 +1,280 @@
+---
+title: "Gradiente"
+author: "Andres Carrillo"
+date: "8/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cargamos librerías
+
+```{r}
+
+library(readr)
+library(ISLR)
+library(MASS)
+library(dplyr)
+library (here)
+
+```
+
+## En primer lugar se realiza la carga de los datos, con el dataset 4_1
+
+```{r}
+
+X4_1_data <- read_csv("Data/4_1_data.csv")
+
+```
+
+## Visualizamos los datos
+
+Tenemos tres variables formadas por 100 observaciones.
+La variable label indica si un indivudo ha sido o no aceptado, siendo 0 no y 1 si
+"punt 1" y "punt2" son las notas de la primera y segunda prueba respectivamente
+
+```{r}
+
+# Observamos los nombres de los datos de nuestra base de datos
+
+names(X4_1_data)
+
+# Para evitar posibles errores, cambiaremos los nombres al dataset y las variables
+# Por si se cometiese algun error, se mantiene el dataset original
+
+datos <-X4_1_data
+
+datos <- rename(datos,"punt1" = "score-1")
+datos <- rename(datos,"punt2" = "score-2")
+
+# Vemos los datos
+
+summary (datos)
+
+```
+
+## Graficamos los datos
+
+```{r}
+
+#Grafico de dispersion
+
+#Realizamos un scatter plot para representar la puntuacion en las pruebas
+#y utilizaremos label como color para poder mostrar tambien quien esta admitido
+#y quien no, representando el color rojo los admitidos y en negro los no admitidos
+
+plot(datos$punt1, datos$punt2, col = as.factor(datos$label), xlab = "punt1", ylab = "punt2")
+
+#Histogramas
+
+#Vemos los histogramas de las dos pruebas y de los alumnos admitidos y no admitidos
+#El histograma de admitidos y no admitidos viene bien para poder observar cuantos
+#hay en un vistazo rapido de admitidos y no admitidos
+
+hist(datos$punt1)
+hist(datos$punt2)
+hist(datos$label)
+
+```
+
+## Creamos datos de entrenamiento y de test
+
+```{r}
+
+#Establecemos una semilla
+set.seed(1234)
+
+#Contamos el numero de filas
+n <- nrow(datos)
+
+# Creamos un split para train y para test aleatorio. 
+#Los datos de training seran el 70% y los de test el 30%
+train_aleatorio <- sample(1:n, 0.70*n) 
+datos.train <- datos[train_aleatorio,]
+datos.test <- datos[-train_aleatorio,]
+
+```
+
+```{r}
+
+# Train
+x.train <- data.frame(rep(1,70), datos.train$punt1, datos.train$punt2)
+x <- as.matrix(x.train) #Esto es x train
+y <- as.matrix(datos.train$label) #Esto es y train
+
+# Test
+x.test <- data.frame(rep(1,30), datos.test$punt1, datos.test$punt2) 
+x.test <- as.matrix(x.test) 
+y.test <- as.matrix(datos.test$label)
+
+```
+
+## Creamos la funcion Sigmoide
+
+```{r}
+
+Sigmoid <- function(x) 
+  1 / (1 + exp(-x))
+
+```
+
+#Funcion de costes
+
+Es la funcion que nos interesa minimizar
+
+```{r}
+
+# Creamos la función
+
+funcionCostes <- function(parametros, X, Y) {
+  n <- nrow(X)
+  g <- Sigmoid(X %*% parametros)
+  J <- (1/n) * sum((-Y * log(g)) - ((1 - Y) * log(1 - g)))
+  return(J)
+}
+
+```
+
+```{r}
+
+#Coste de inicio
+#Tomando como valor inicial de los parametros (beta) cero se calculara el valor
+#del coste inicial 
+#El objetivo es reducir ese coste.
+
+parametros <- rep(0, ncol(x))
+
+# Coste máximo
+
+coste_inicial = funcionCostes(parametros, x, y)
+coste_inicial
+
+#Esto se utiliza para que el coste sea presentado de la forma mas adecuada posible:
+
+print(paste("El coste inicial de la funcion es: ", convergence <- c(funcionCostes(parametros, x, y)), sep = ""))
+
+```
+
+Calculo del numero optimo de iteraciones
+Se generara una funcion para obtener el numero optimo de iteraciones
+
+```{r}
+
+TestGradientDescent <- function(iterations = 1200, X, Y) {
+  parametros <- rep(0, ncol(X)
+                    )
+  print(paste("Función inicial de costes: ", 
+              convergence <- c(funcionCostes(parametros, X, Y)), sep = ""))
+  parametros_optimizacion <- optim(par = parametros, fn = funcionCostes, X = X, Y = Y, 
+                                   control = list(maxit = iterations))
+  #Seleccionamos los parámetros
+  parametros <- parametros_optimizacion$par
+  
+  # Chequeamos la evolución
+  print(paste("Valor final de la función de costes: ", 
+              convergence <- c(funcionCostes(parametros, X, Y)), sep = ""))
+
+ return(parametros) 
+}
+
+```
+
+```{r}
+
+#Se ejecuta la funcion acorde a nuestros valores
+
+parametros_optimos <-TestGradientDescent(X = x, Y= y)
+parametros_optimos
+
+probabilidades <- Sigmoid((x.test %*% parametros_optimos)) 
+probabilidades
+
+```
+
+```{r}
+
+# Hacemos el cut of, en este caso se ha escogido 0.5 ya que es justo el punto medio
+
+probabilidades[probabilidades >= 0.5] <- 1
+probabilidades[probabilidades< 0.5] <- 0
+probabilidades
+
+y.test
+
+```
+
+##Matriz de confusion
+
+```{r}
+
+#Creamos la matriz de confusión
+
+table(y.test, probabilidades, dnn=c("Real", "Prediccion"))
+
+```
+
+```{r}
+
+#Calculamos el accuracy
+
+accuracy<-100*sum(diag(table(y.test, probabilidades)))/sum(table(y.test, probabilidades)) 
+accuracy
+
+```
+
+## Iteraciones individuales se busca saber el error que tiene el modelo
+para cada una de las  iteraciones
+
+```{r}
+
+#Sacamos el error del modelo para cada iteracion
+
+TestGradientDescent <- function(iterations = 1200, X, Y) {
+  parametros <- rep(0, ncol(X))
+  errores <- NULL
+  for (iteracion in 1:iterations) {
+    parametros_optimizacion <- optim(par = parametros, fn = funcionCostes, X = X, Y = Y, 
+                                   control = list(maxit = iteracion))
+    errores[iteracion]<- parametros_optimizacion$value
+  }
+ return(errores) 
+}
+
+#Asignamos valores
+
+ejeY <- TestGradientDescent(400, X = x.test, Y = y.test)
+ejex <- 1:400
+
+# Representamos gráficamente el error medio para cada iteración
+
+plot(x = ejex, y=ejeY)
+
+```
+
+## Explorar la función "Optium"
+
+```{r}
+
+#Vemos qué argumentos tiene esta función
+args(optim)
+
+##### Existen diversos métodos para optimizar la función y su convergencia usando la funcion "optim". Estos métodos son: method = "Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN", "Brent"
+
+##### En la salida de la función se explica si han convergido (valor 0) o no (valor 1)
+
+```
+
+Se va a explorar el modelo BFGs:
+
+Hace uso tanto del gradiente como de una aproximación a la inversa de la matriz hessiana de la función, esto para hacer una aproximación al cálculo de la segunda derivada. Tiene el problema de que es costoso computacionalmente para funciones de muchas variables. Es adecuado para funciones no lineales de varias variables.
+
+```{r}
+
+parametros_optimizados_1 <- optim(par = parametros, fn = funcionCostes, X = x, Y = y, method = "BFGS",lower=-Inf,upper=Inf,control = list(maxit = 60), hessian=TRUE) 
+
+parametros_optimizados_1
+
+```
+
